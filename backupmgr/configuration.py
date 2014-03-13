@@ -15,7 +15,7 @@ from . import package_logger
 from . import error
 from . import backend_types
 
-if sys.platform.startswith("darwin")
+if sys.platform.startswith("darwin"):
     DEFAULT_STATEFILE = "/var/db/backupmgr.state"
 else:
     DEFAULT_STATEFILE = "/var/lib/backupmgr/state"

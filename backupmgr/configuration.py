@@ -110,21 +110,21 @@ class ConfiguredBackup(object):
     def should_run(self, last_run):
         if last_run == datetime.datetime.fromtimestamp(0):
             return True
+        delta = datetime.datetime.now() - last_run
+        if delta.days == 0 and delta.seconds / 3600 < 12:
+            self.logger.warn("Backup \"{}\" ran in the "
+                             "last 12 hours (at {})".format(self.name, last_run))
+            return False
         if MONTHLY in self.timespec and datetime.datetime.now().day == 0:
             return True
         if WEEKLY in self.timespec and datetime.datetime.now().weekday() == WEEKDAY_NUMBERS[MONDAY]:
             return True
 
         days = {WEEKDAY_NUMBERS[day] for day in self.timespec if day in WEEKDAYS}
-        if datetime.datetime.now().weekday() not in days:
-            return False
-        
-        delta = datetime.datetime.now() - last_run
-        if delta.days == 0 and delta.seconds / 3600 < 12:
-            self.logger.warn("Backup \"{}\" would run, but ran in the"
-                             "last 12 hours (at {})".format(self.name, last_run))
-            return False
-        return True
+        if datetime.datetime.now().weekday() in days:
+            return True
+
+        return False
 
     def perform(self):
         info = {
@@ -244,6 +244,7 @@ class Config(object):
                 raise
 
         if config_mtime > state_mtime:
+            self.logger.info("Configuration changed. Running all backups.")
             return self.configured_backups
 
         for backup in self.configured_backups:

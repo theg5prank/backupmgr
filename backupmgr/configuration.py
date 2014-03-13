@@ -132,8 +132,10 @@ class ConfiguredBackup(object):
             "timestamp": time.time()
         }
         backup_name = self.backup_name.format(**info)
+        success = True
         for backend in self.backends:
-            backend.perform(self.paths, backup_name)
+            success = success and backend.perform(self.paths, backup_name)
+        return success
 
 
 class Config(object):

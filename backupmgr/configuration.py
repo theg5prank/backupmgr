@@ -137,6 +137,7 @@ class Config(object):
         return {}
 
     def __init__(self):
+        self.configfile = CONFIG_LOCATION
         try:
             with open(CONFIG_LOCATION) as f:
                 try:
@@ -221,7 +222,24 @@ class Config(object):
         return datetime.datetime.fromtimestamp(stamp)
 
     def backups_due(self):
-        return [backup for backup in self.configured_backups if backup.should_run(self.last_run_of_backup(backup))]
+        backups_to_run = []
+        config_mtime = os.stat(self.configfile).st_mtime
+
+        try:
+            state_mtime = os.stat(self.statefile).st_mtime
+        except OSError as e:
+            if e.errno == errno.ENOENT:
+                state_mtime = 0
+            else:
+                raise
+
+        if config_mtime > state_mtime:
+            return self.configured_backups
+
+        for backup in self.configured_backups:
+            if backup.should_run(self.last_run_of_backup(backup)):
+                backups_to_run.append(backup)
+        return backups_to_run
 
 def read_config():
     return Config()

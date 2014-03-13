@@ -53,7 +53,7 @@ class Application(object):
                 if backup.perform():
                     backup_successes.append(backup)
             self.log_backups(backup_successes)
-            self.logger.info("Successfully completed {}/{} backups.".format(len(backups_successes), len(backups)))
+            self.logger.info("Successfully completed {}/{} backups.".format(len(backup_successes), len(backups)))
         except error.Error as e:
             self.logger.fatal(e.message)
             sys.exit(1)

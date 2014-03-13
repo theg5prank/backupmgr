@@ -21,8 +21,6 @@ class TarsnapBackend(backend_types.BackupBackend):
     def __init__(self, config):
         super(TarsnapBackend, self).__init__(config)
         self.keyfile = config.pop("keyfile", None)
-        if self.keyfile is None:
-            raise backend_types.BackendConfigurationError("Need keyfile for tarsnap backend")
 
     def perform(self, paths, backup_name):
         self.logger.info("Creating backup \"{}\": {}".format(backup_name, " ,".join(paths)))
@@ -31,9 +29,14 @@ class TarsnapBackend(backend_types.BackupBackend):
             for path, name in paths.items():
                 os.symlink(path, os.path.join(tmpdir, name))
             argv = [TARSNAP_PATH, "-C", tmpdir, "-H", "-cf", backup_name]
+            if self.keyfile is not None:
+                argv += ["--keyfile", self.keyfile]
             argv += paths.values()
             self.logger.info("Invoking tarsnap: {}".format(argv))
-            proc = subprocess.Popen(argv)
+            proc = subprocess.Popen(argv, stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
+            proc_logger = self.logger.getChild("tarsnap_output")
+            for line in proc.stdout:
+                proc_logger.info(line.strip())
             code = proc.wait()
             if code != 0:
                 self.logger.error("Tarsnap invocation failed with exit code {}".format(code))

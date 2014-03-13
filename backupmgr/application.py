@@ -48,9 +48,11 @@ class Application(object):
             self.bootstrap()
             self.load_config()
             backups = self.prepare_backups()
+            backup_successes = []
             for backup in backups:
-                backup.perform()
-            self.log_backups(backups)
+                if backup.perform():
+                    backup_successes.append(backup)
+            self.log_backups(backup_successes)
         except error.Error as e:
             self.logger.fatal(e.message)
             sys.exit(1)

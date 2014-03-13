@@ -14,9 +14,8 @@ from . import package_logger
 from . import error
 from . import backend_types
 
-DEFAULT_STATEFILE = os.path.expanduser("~/backupmgr.state")
-#CONFIG_LOCATION = "/etc/backupmgr.conf"
-CONFIG_LOCATION = os.path.expanduser("~/backupmgr.conf")
+DEFAULT_STATEFILE = "/var/db/backupmgr.state"
+CONFIG_LOCATION = "/etc/backupmgr.conf"
 
 WEEKDAYS = [object() for _ in xrange(7)]
 MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY = WEEKDAYS

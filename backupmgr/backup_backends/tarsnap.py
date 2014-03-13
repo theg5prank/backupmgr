@@ -30,13 +30,16 @@ class TarsnapBackend(backend_types.BackupBackend):
         try:
             for path, name in paths.items():
                 os.symlink(path, os.path.join(tmpdir, name))
-            argv = [TARSNAP_PATH, "-C", tmpdir, "-H", "-f", backup_name]
+            argv = [TARSNAP_PATH, "-C", tmpdir, "-H", "-cf", backup_name]
             argv += paths.values()
             self.logger.info("Invoking tarsnap: {}".format(argv))
             proc = subprocess.Popen(argv)
             code = proc.wait()
             if code != 0:
                 self.logger.error("Tarsnap invocation failed with exit code {}".format(code))
+                return False
+            else:
+                return True
         finally:
             for path, name in paths.items():
                 path = os.path.join(tmpdir, name)

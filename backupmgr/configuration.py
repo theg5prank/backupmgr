@@ -116,7 +116,15 @@ class ConfiguredBackup(object):
             return True
 
         days = {WEEKDAY_NUMBERS[day] for day in self.timespec if day in WEEKDAYS}
-        return datetime.datetime.now().weekday() in days
+        if datetime.datetime.now().weekday() not in days:
+            return False
+        
+        delta = datetime.datetime.now() - last_run
+        if delta.days == 0 and delta.seconds / 3600 < 12:
+            self.logger.warn("Backup \"{}\" would run, but ran in the"
+                             "last 12 hours (at {})".format(self.name, last_run))
+            return False
+        return True
 
     def perform(self):
         info = {

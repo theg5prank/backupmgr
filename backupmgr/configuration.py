@@ -1,6 +1,7 @@
 #!/usr/bin/env python2.7
 
 import os
+import sys
 import os.path
 import json
 import errno
@@ -14,7 +15,11 @@ from . import package_logger
 from . import error
 from . import backend_types
 
-DEFAULT_STATEFILE = "/var/db/backupmgr.state"
+if sys.platform.startswith("darwin")
+    DEFAULT_STATEFILE = "/var/db/backupmgr.state"
+else:
+    DEFAULT_STATEFILE = "/var/lib/backupmgr/state"
+
 CONFIG_LOCATION = "/etc/backupmgr.conf"
 
 WEEKDAYS = [object() for _ in xrange(7)]

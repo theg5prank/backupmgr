@@ -32,3 +32,19 @@ class EmailHandler(logging.Handler):
 
         proc.stdin.write(m.as_string())
         proc.stdin.close()
+
+
+class SwitchableStreamHandler(logging.StreamHandler):
+    def __init__(self, *args, **kwargs):
+        super(SwitchableStreamHandler, self).__init__(*args, **kwargs)
+        self.__enabled = True
+
+    def disable(self):
+        self.__enabled = False
+
+    def enable(self):
+        self.__enabled = True
+
+    def emit(self, record):
+        if self.__enabled or record.levelno >= logging.WARNING:
+            super(SwitchableStreamHandler, self).emit(record)

@@ -10,6 +10,7 @@ import datetime
 import collections
 import itertools
 import socket
+import argparse
 
 from . import package_logger
 from . import error
@@ -147,6 +148,11 @@ class Config(object):
         return {}
 
     def __init__(self):
+        parser = argparse.ArgumentParser()
+        parser.add_argument("-q", "--quiet", action="store_true")
+        ns = parser.parse_args()
+        self.quiet = ns.quiet
+
         self.configfile = CONFIG_LOCATION
         try:
             with open(CONFIG_LOCATION) as f:
@@ -220,6 +226,7 @@ class Config(object):
         for name, count in collections.Counter([backup.name for backup in self.configured_backups]).items():
             if count > 1:
                 raise InvalidConfigError("Duplicate backup \"{}\"".format(name))
+
 
     def log_run(self, backups):
         for backup in backups:

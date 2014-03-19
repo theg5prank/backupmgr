@@ -8,9 +8,7 @@ from . import configuration
 from . import package_logger
 from . import error
 from . import backend_types
-from . import email_handler
-
-LOGGER_NAME = "backupmgr.application.main"
+from . import logging_handlers
 
 class Application(object):
     @property
@@ -20,9 +18,13 @@ class Application(object):
     def configure_logging(self):
         logging.basicConfig()
         l = package_logger()
+        l.propagate=False
         l.setLevel(logging.DEBUG)
-        self.handler = email_handler.EmailHandler("root", "root")
-        l.addHandler(self.handler)
+        self.email_handler = logging_handlers.EmailHandler("root", "root")
+        self.stderr_handler = logging_handlers.SwitchableStreamHandler()
+        self.stderr_handler.formatter = logging.Formatter('%(levelname)s: %(name)s: %(message)s')
+        l.addHandler(self.email_handler)
+        l.addHandler(self.stderr_handler)
 
     def bootstrap(self):
         self.configure_logging()
@@ -30,7 +32,9 @@ class Application(object):
 
     def load_config(self):
         self.config = configuration.read_config()
-        self.handler.toaddr = self.config.notification_address
+        self.email_handler.toaddr = self.config.notification_address
+        if self.config.quiet:
+            self.stderr_handler.disable()
 
     def prepare_backups(self):
         backups = self.config.backups_due()
@@ -41,7 +45,7 @@ class Application(object):
         self.config.log_run(backups)
 
     def finalize(self):
-        self.handler.finalize()
+        self.email_handler.finalize()
 
     def run(self):
         try:

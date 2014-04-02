@@ -5,6 +5,8 @@ import tempfile
 import shutil
 import errno
 import subprocess
+import hashlib
+import time
 
 from .. import backend_types
 from .. import package_logger
@@ -21,14 +23,27 @@ class TarsnapBackend(backend_types.BackupBackend):
     def __init__(self, config):
         super(TarsnapBackend, self).__init__(config)
         self.keyfile = config.pop("keyfile", None)
+        self.host = config.pop("host", None)
+
+    def create_backup_identifier(self, backup_name):
+        ctx = hashlib.sha1()
+        ctx.update(self.name.decode("utf-8"))
+        ctx.update(backup_name.decode("utf-8"))
+        return ctx.hexdigest()
+
+    def create_backup_instance_name(self, backup_name):
+        return "{}-{}-{}".format(self.create_backup_identifier(backup_name),
+                                 time.time(), backup_name)
 
     def perform(self, paths, backup_name):
-        self.logger.info("Creating backup \"{}\": {}".format(backup_name, " ,".join(paths)))
+        backup_instance_name = self.create_backup_instance_name(backup_name)
+        self.logger.info("Creating backup \"{}\": {}"
+                            .format(backup_instance_name, ", ".join(paths)))
         tmpdir = tempfile.mkdtemp()
         try:
             for path, name in paths.items():
                 os.symlink(path, os.path.join(tmpdir, name))
-            argv = [TARSNAP_PATH, "-C", tmpdir, "-H", "-cf", backup_name]
+            argv = [TARSNAP_PATH, "-C", tmpdir, "-H", "-cf", backup_instance_name]
             if self.keyfile is not None:
                 argv += ["--keyfile", self.keyfile]
             argv += paths.values()

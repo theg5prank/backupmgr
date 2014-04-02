@@ -128,14 +128,9 @@ class ConfiguredBackup(object):
         return False
 
     def perform(self):
-        info = {
-            "hostname": socket.gethostname(),
-            "timestamp": time.time()
-        }
-        backup_name = self.backup_name.format(**info)
         success = True
         for backend in self.backends:
-            success = success and backend.perform(self.paths, backup_name)
+            success = success and backend.perform(self.paths, self.name)
         return success
 
 

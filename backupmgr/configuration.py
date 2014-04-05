@@ -116,7 +116,7 @@ class ConfiguredBackup(object):
             self.logger.warn("Backup \"{}\" ran in the "
                              "last 12 hours (at {})".format(self.name, last_run))
             return False
-        if MONTHLY in self.timespec and datetime.datetime.now().day == 0:
+        if MONTHLY in self.timespec and datetime.datetime.now().day == 1:
             return True
         if WEEKLY in self.timespec and datetime.datetime.now().weekday() == WEEKDAY_NUMBERS[MONDAY]:
             return True

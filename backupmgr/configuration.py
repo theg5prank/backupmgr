@@ -142,11 +142,20 @@ class Config(object):
     def default_state(self):
         return {}
 
-    def __init__(self):
-        parser = argparse.ArgumentParser()
-        parser.add_argument("-q", "--quiet", action="store_true")
-        ns = parser.parse_args()
-        self.quiet = ns.quiet
+    def parse_args(self):
+        parser = argparse.ArgumentParser(prog=self.prog)
+        parser.add_argument("-q", "--quiet", action="store_true", 
+                            help="Be quiet on logging to stdout/stderr")
+        subparsers = parser.add_subparsers()
+        parser_backup = subparsers.add_parser("backup")
+        parser_backup.set_defaults(verb="backup")
+        return parser.parse_args(self.argv)
+
+    def __init__(self, argv, prog):
+        self.argv = argv
+        self.prog = prog
+        ns = self.parse_args()
+        self.config_options = ns
 
         self.configfile = CONFIG_LOCATION
         try:
@@ -253,6 +262,3 @@ class Config(object):
             if backup.should_run(self.last_run_of_backup(backup)):
                 backups_to_run.append(backup)
         return backups_to_run
-
-def read_config():
-    return Config()

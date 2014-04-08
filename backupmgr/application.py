@@ -15,6 +15,9 @@ class Application(object):
     def logger(self):
         return package_logger().getChild("application")
 
+    def __init__(self, argv):
+        self.argv = argv
+
     def configure_logging(self):
         logging.basicConfig()
         l = package_logger()
@@ -31,9 +34,9 @@ class Application(object):
         backend_types.load_backend_types()
 
     def load_config(self):
-        self.config = configuration.read_config()
+        self.config = configuration.Config(self.argv, "backupmgr")
         self.email_handler.toaddr = self.config.notification_address
-        if self.config.quiet:
+        if self.config.config_options.quiet:
             self.stderr_handler.disable()
 
     def prepare_backups(self):
@@ -47,17 +50,26 @@ class Application(object):
     def finalize(self):
         self.email_handler.finalize()
 
+    def perform_backups(self):
+        backups = self.prepare_backups()
+        backup_successes = []
+        for backup in backups:
+            if backup.perform():
+                backup_successes.append(backup)
+        self.log_backups(backup_successes)
+        self.logger.info("Successfully completed {}/{} backups.".format(len(backup_successes), len(backups)))
+
+    def unknown_verb(self):
+        raise Exception("Unknown verb")
+
     def run(self):
+        verbs = {
+            "backup": self.perform_backups
+        }
         try:
             self.bootstrap()
             self.load_config()
-            backups = self.prepare_backups()
-            backup_successes = []
-            for backup in backups:
-                if backup.perform():
-                    backup_successes.append(backup)
-            self.log_backups(backup_successes)
-            self.logger.info("Successfully completed {}/{} backups.".format(len(backup_successes), len(backups)))
+            verbs.get(self.config.config_options.verb, self.unknown_verb)()
         except error.Error as e:
             self.logger.fatal(e.message)
             sys.exit(1)

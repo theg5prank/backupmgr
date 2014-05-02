@@ -1,6 +1,7 @@
 #!/usr/bin/env python2.7
 
 import logging
+import os
 import sys
 import traceback
 import datetime
@@ -45,11 +46,15 @@ class Application(object):
         self.logger.info("Backups due: {}".format(", ".join([b.name for b in backups])))
         return backups
 
-    def log_backups(self, backups):
+    def note_successful_backups(self, backups):
         self.config.save_state_given_new_backups(backups)
 
+    def should_send_email(self):
+        os.isatty(0)
+
     def finalize(self):
-        self.email_handler.finalize()
+        if self.should_send_email():
+            self.email_handler.finalize()
 
     def perform_backups(self):
         backups = self.prepare_backups()
@@ -57,7 +62,7 @@ class Application(object):
         for backup in backups:
             if backup.perform():
                 backup_successes.append(backup)
-        self.log_backups(backup_successes)
+        self.note_successful_backups(backup_successes)
         self.logger.info("Successfully completed {}/{} backups.".format(len(backup_successes), len(backups)))
 
     def unknown_verb(self):

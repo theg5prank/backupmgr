@@ -3,6 +3,7 @@
 import logging
 import sys
 import traceback
+import datetime
 
 from . import configuration
 from . import package_logger
@@ -40,12 +41,12 @@ class Application(object):
             self.stderr_handler.disable()
 
     def prepare_backups(self):
-        backups = self.config.backups_due()
+        backups = self.config.configured_backups.backups_due()
         self.logger.info("Backups due: {}".format(", ".join([b.name for b in backups])))
         return backups
 
     def log_backups(self, backups):
-        self.config.log_run(backups)
+        self.config.save_state_given_new_backups(backups)
 
     def finalize(self):
         self.email_handler.finalize()

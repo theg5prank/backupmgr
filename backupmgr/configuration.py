@@ -30,6 +30,9 @@ WEEKLY = object()
 
 WEEKDAY_NUMBERS = dict(zip(WEEKDAYS, itertools.count()))
 
+def module_logger():
+    return package_logger().getChild("configuration")
+
 class NoConfigError(error.Error):
     def __init__(self):
         super(NoConfigError, self).__init__("No config exists.")
@@ -99,7 +102,7 @@ def validate_paths(paths):
 class ConfiguredBackup(object):
     @property
     def logger(self):
-        return package_logger().getChild("backup")
+        return module_logger().getChild("ConfiguredBackup")
 
     def __init__(self, name, paths, backup_name, timespec, backends):
         self.name = name
@@ -108,17 +111,18 @@ class ConfiguredBackup(object):
         self.timespec = timespec
         self.backends = backends
 
-    def should_run(self, last_run):
+    def should_run(self, last_run, time):
         if last_run == datetime.datetime.fromtimestamp(0):
             return True
-        delta = datetime.datetime.now() - last_run
+
+        delta = time - last_run
         if delta.days == 0 and delta.seconds / 3600 < 12:
             self.logger.warn("Backup \"{}\" ran in the "
                              "last 12 hours (at {})".format(self.name, last_run))
             return False
-        if MONTHLY in self.timespec and datetime.datetime.now().day == 1:
+        if MONTHLY in self.timespec and time.day == 1:
             return True
-        if WEEKLY in self.timespec and datetime.datetime.now().weekday() == WEEKDAY_NUMBERS[MONDAY]:
+        if WEEKLY in self.timespec and time.weekday() == WEEKDAY_NUMBERS[MONDAY]:
             return True
 
         days = {WEEKDAY_NUMBERS[day] for day in self.timespec if day in WEEKDAYS}
@@ -134,13 +138,46 @@ class ConfiguredBackup(object):
         return success
 
 
+class ConfiguredBackupSet(object):
+    @property
+    def logger(self):
+        return package_logger().getChild("ConfiguredBackupSet")
+
+    def __init__(self, state, configured_backups, config_mtime, state_mtime, 
+                 now):
+        self.configured_backups = configured_backups
+        self.config_mtime = config_mtime
+        self.state_mtime = state_mtime
+        self.state = state
+        self.now = now
+
+    def state_after_backups(self, backups):
+        new_state = self.state.copy()        
+        for backup in backups:
+            new_state[backup.name] = time.mktime(self.now.timetuple())
+        return new_state
+
+    def last_run_of_backup(self, backup):
+        stamp = self.state.get(backup.name, 0)
+        return datetime.datetime.fromtimestamp(stamp)
+
+    def backups_due(self):
+        backups_to_run = []
+
+        if self.config_mtime > self.state_mtime:
+            self.logger.info("Configuration changed. Should run all backups.")
+            return self.configured_backups
+
+        for backup in self.configured_backups:
+            if backup.should_run(self.last_run_of_backup(backup), self.now):
+                backups_to_run.append(backup)
+        return backups_to_run
+
+
 class Config(object):
     @property
     def logger(self):
-        return package_logger().getChild("configuration")
-
-    def default_state(self):
-        return {}
+        return module_logger().getChild("Config")
 
     def parse_args(self):
         parser = argparse.ArgumentParser(prog=self.prog)
@@ -151,6 +188,28 @@ class Config(object):
         parser_backup.set_defaults(verb="backup")
         return parser.parse_args(self.argv)
 
+    def default_state(self):
+        return {}
+
+    def load_state(self):
+        try:
+            with open(self.statefile_path) as f:
+                state = json.load(f)
+        except Exception as e:
+            self.logger.warn(e)
+            self.logger.warn("Could not read state. Assuming default state.")
+            state = self.default_state()
+
+        return state
+
+    def save_state(self, state):
+        with open(self.statefile_path, 'w') as f:
+            json.dump(state, f)
+
+    def save_state_given_new_backups(self, backups):
+        new_state = self.configured_backups.state_after_backups(backups)
+        self.save_state(new_state)
+
     def __init__(self, argv, prog):
         self.argv = argv
         self.prog = prog
@@ -159,7 +218,7 @@ class Config(object):
 
         self.configfile = CONFIG_LOCATION
         try:
-            with open(CONFIG_LOCATION) as f:
+            with open(self.configfile) as f:
                 try:
                     config_dict = json.load(f)
                 except Exception as e:
@@ -170,14 +229,7 @@ class Config(object):
             else:
                 raise
         self.notification_address = config_dict.get("notification_address", "root")
-        self.statefile = config_dict.get("statefile", DEFAULT_STATEFILE)
-        try:
-            with open(self.statefile) as f:
-                self.state = json.load(f)
-        except Exception as e:
-            self.logger.warn(e)
-            self.logger.warn("Could not read state. Assuming default state.")
-            self.state = self.default_state()
+        self.statefile_path = config_dict.get("statefile", DEFAULT_STATEFILE)
 
         def parse_backend_type(backend_dict):
             if not isinstance(backend_dict, dict):
@@ -223,42 +275,24 @@ class Config(object):
 
         if not isinstance(config_dict.get("backups", None), list):
             raise InvalidConfigError("Expected a list of backups")
-        self.configured_backups = [
+        configured_backups = [
             parse_backup(backup_dict) for backup_dict in config_dict["backups"]
         ]
 
-        for name, count in collections.Counter([backup.name for backup in self.configured_backups]).items():
+        for name, count in collections.Counter([backup.name for backup in configured_backups]).items():
             if count > 1:
                 raise InvalidConfigError("Duplicate backup \"{}\"".format(name))
 
-
-    def log_run(self, backups):
-        for backup in backups:
-            self.state[backup.name] = time.time()
-        with open(self.statefile, 'w') as f:
-            json.dump(self.state, f)
-
-    def last_run_of_backup(self, backup):
-        stamp = self.state.get(backup.name, 0)
-        return datetime.datetime.fromtimestamp(stamp)
-
-    def backups_due(self):
-        backups_to_run = []
-        config_mtime = os.stat(self.configfile).st_mtime
-
         try:
-            state_mtime = os.stat(self.statefile).st_mtime
+            state_mtime = os.stat(self.statefile_path).st_mtime
         except OSError as e:
             if e.errno == errno.ENOENT:
                 state_mtime = 0
             else:
                 raise
 
-        if config_mtime > state_mtime:
-            self.logger.info("Configuration changed. Running all backups.")
-            return self.configured_backups
+        state = self.load_state()
 
-        for backup in self.configured_backups:
-            if backup.should_run(self.last_run_of_backup(backup)):
-                backups_to_run.append(backup)
-        return backups_to_run
+        self.configured_backups = ConfiguredBackupSet(
+            state, configured_backups, os.stat(self.configfile).st_mtime,
+            state_mtime, datetime.datetime.now())

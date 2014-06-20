@@ -137,6 +137,15 @@ class ConfiguredBackup(object):
             success = success and backend.perform(self.paths, self.name)
         return success
 
+    def get_all_archives(self):
+        pairs = []
+
+        for backend in self.backends:
+            pairs.append(
+                [backend, backend.existing_archives_for_name(self.name)])
+
+        return pairs
+
 
 class ConfiguredBackupSet(object):
     @property
@@ -173,6 +182,9 @@ class ConfiguredBackupSet(object):
                 backups_to_run.append(backup)
         return backups_to_run
 
+    def all_backups(self):
+        return self.configured_backups
+
 
 class Config(object):
     @property
@@ -186,6 +198,8 @@ class Config(object):
         subparsers = parser.add_subparsers()
         parser_backup = subparsers.add_parser("backup")
         parser_backup.set_defaults(verb="backup")
+        parser_list = subparsers.add_parser("list")
+        parser_list.set_defaults(verb="list")
         return parser.parse_args(self.argv)
 
     def default_state(self):

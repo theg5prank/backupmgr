@@ -41,23 +41,26 @@ class Application(object):
         if self.config.config_options.quiet:
             self.stderr_handler.disable()
 
-    def prepare_backups(self):
+    def get_due_backups(self):
         backups = self.config.configured_backups.backups_due()
         self.logger.info("Backups due: {}".format(", ".join([b.name for b in backups])))
         return backups
+
+    def get_all_backups(self):
+        return self.config.configured_backups.all_backups()
 
     def note_successful_backups(self, backups):
         self.config.save_state_given_new_backups(backups)
 
     def should_send_email(self):
-        os.isatty(0)
+        return not os.isatty(0)
 
     def finalize(self):
         if self.should_send_email():
             self.email_handler.finalize()
 
     def perform_backups(self):
-        backups = self.prepare_backups()
+        backups = self.get_due_backups()
         backup_successes = []
         for backup in backups:
             if backup.perform():
@@ -65,17 +68,29 @@ class Application(object):
         self.note_successful_backups(backup_successes)
         self.logger.info("Successfully completed {}/{} backups.".format(len(backup_successes), len(backups)))
 
+    def list_backups(self):
+        for backup in self.get_all_backups():
+            sys.stdout.write("{}:\n".format(backup.name))
+            for backend, archives in backup.get_all_archives():
+                sys.stdout.write("\t{}:\n".format(backend.name))
+                for archive in sorted(archives, cmp=lambda x,y: cmp(x.time, y.time)):
+                    time = datetime.datetime.fromtimestamp(archive.time)
+                    human_time = time.strftime("%Y-%m-%d %H:%M:%S")
+                    sys.stdout.write("\t\t{} ({})\n".format(human_time, archive.time))
+
     def unknown_verb(self):
         raise Exception("Unknown verb")
 
     def run(self):
         verbs = {
-            "backup": self.perform_backups
+            "backup": self.perform_backups,
+            "list": self.list_backups
         }
         try:
             self.bootstrap()
             self.load_config()
             verbs.get(self.config.config_options.verb, self.unknown_verb)()
+            sys.exit(0)
         except error.Error as e:
             self.logger.fatal(e.message)
             sys.exit(1)
@@ -83,7 +98,5 @@ class Application(object):
             self.logger.fatal("Unexpected error: {}".format(e))
             self.logger.fatal(traceback.format_exc())
             sys.exit(1)
-        else:
-            sys.exit(0)
         finally:
             self.finalize()

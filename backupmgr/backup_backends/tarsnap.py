@@ -7,11 +7,22 @@ import errno
 import subprocess
 import hashlib
 import time
+import re
 
 from .. import backend_types
 from .. import package_logger
 
 TARSNAP_PATH = "/usr/local/bin/tarsnap"
+
+def backup_instance_regex(identifier, name):
+    return re.compile(
+        r"^(?P<identifier>{})-(?P<timestamp>\d+(.\d+)?)-(?P<name>{})$"
+            .format(re.escape(identifier), re.escape(name)))
+
+class TarsnapArchive(object):
+    def __init__(self, backend, time):
+        self.backend = backend
+        self.time = time
 
 class TarsnapBackend(backend_types.BackupBackend):
     NAMES = {"tarsnap"}
@@ -67,3 +78,25 @@ class TarsnapBackend(backend_types.BackupBackend):
                     if e.errno == errno.ENOENT:
                         pass
             os.rmdir(tmpdir)
+
+    def existing_archives_for_name(self, backup_name):
+        argv = [TARSNAP_PATH, "--list-archives"]
+        if self.keyfile is not None:
+            argv += ["--keyfile", self.keyfile]
+
+        proc = subprocess.Popen(argv, stdout=subprocess.PIPE)
+
+        identifier = self.create_backup_identifier(backup_name)
+        regex = backup_instance_regex(identifier, backup_name)
+
+        results = []
+        for line in proc.stdout:
+            m = regex.match(line)
+            if m:
+                ts = float(m.groupdict()["timestamp"])
+                results.append(TarsnapArchive(self, ts))
+
+        if proc.wait() != 0:
+            self.logger.error("Tarsnap invocation failed with exit code {}".format(proc.returncode))
+
+        return results

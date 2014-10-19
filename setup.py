@@ -50,12 +50,12 @@ def setup(args=None):
         author_email=author_email,
         zip_safe=True,
         #url=None,
-        install_requires=None,
+        install_requires=["python-dateutil"],
         long_description=long_description,
         license='BSD',
         classifiers=[
             'Development Status :: 3 - Alpha',
-            'Intended Audience :: Developers',
+            'Intended Audience :: Developers'
         ])
 
 if __name__ == '__main__':

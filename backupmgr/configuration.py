@@ -12,6 +12,8 @@ import itertools
 import socket
 import argparse
 
+import dateutil.parser, dateutil.tz
+
 from . import package_logger
 from . import error
 from . import backend_types
@@ -56,7 +58,7 @@ def validate_timespec(spec):
             return [MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY]
         else:
             spec = [spec]
-    
+
     if not isinstance(spec, list) or any((not isinstance(x, basestring) for x in spec)):
         raise InvalidConfigError("Invalid timespec {}".format(spec))
 
@@ -152,7 +154,7 @@ class ConfiguredBackupSet(object):
     def logger(self):
         return package_logger().getChild("ConfiguredBackupSet")
 
-    def __init__(self, state, configured_backups, config_mtime, state_mtime, 
+    def __init__(self, state, configured_backups, config_mtime, state_mtime,
                  now):
         self.configured_backups = configured_backups
         self.config_mtime = config_mtime
@@ -161,7 +163,7 @@ class ConfiguredBackupSet(object):
         self.now = now
 
     def state_after_backups(self, backups):
-        new_state = self.state.copy()        
+        new_state = self.state.copy()
         for backup in backups:
             new_state[backup.name] = time.mktime(self.now.timetuple())
         return new_state
@@ -186,6 +188,21 @@ class ConfiguredBackupSet(object):
         return self.configured_backups
 
 
+def parse_simple_date(datestr):
+    try:
+        timestamp = float(datestr)
+    except ValueError:
+        date = dateutil.parser.parse(datestr)
+        if date.tzinfo is None:
+            # If there is no tz info in this date, assume the user meant to use
+            # local time
+            date = date.replace(tzinfo=dateutil.tz.tzlocal())
+    else:
+        date = datetime.datetime.fromtimestamp(timestamp)
+        date = date.replace(tzinfo=dateutil.tz.tzlocal())
+
+    return date
+
 class Config(object):
     @property
     def logger(self):
@@ -193,13 +210,17 @@ class Config(object):
 
     def parse_args(self):
         parser = argparse.ArgumentParser(prog=self.prog)
-        parser.add_argument("-q", "--quiet", action="store_true", 
+        parser.add_argument("-q", "--quiet", action="store_true",
                             help="Be quiet on logging to stdout/stderr")
         subparsers = parser.add_subparsers()
         parser_backup = subparsers.add_parser("backup")
         parser_backup.set_defaults(verb="backup")
         parser_list = subparsers.add_parser("list")
         parser_list.set_defaults(verb="list")
+        parser_list.add_argument("--before", dest="before", default=None,
+                                 type=parse_simple_date)
+        parser_list.add_argument("--after", dest="after", default=None,
+                                 type=parse_simple_date)
         return parser.parse_args(self.argv)
 
     def default_state(self):

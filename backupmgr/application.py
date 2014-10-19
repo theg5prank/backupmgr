@@ -5,6 +5,7 @@ import os
 import sys
 import traceback
 import datetime
+import dateutil
 
 from . import configuration
 from . import package_logger
@@ -55,6 +56,17 @@ class Application(object):
     def should_send_email(self):
         return not os.isatty(0)
 
+    def within_timespec(self, archive):
+        before = self.config.config_options.before
+        after = self.config.config_options.after
+        archive_date = datetime.datetime.utcfromtimestamp(archive.time)
+        archive_date = archive_date.replace(tzinfo=dateutil.tz.tzutc())
+        if before is not None and archive_date >= before:
+            return False
+        if after is not None and archive_date <= after:
+            return False
+        return True
+
     def finalize(self):
         if self.should_send_email():
             self.email_handler.finalize()
@@ -72,6 +84,7 @@ class Application(object):
         for backup in self.get_all_backups():
             sys.stdout.write("{}:\n".format(backup.name))
             for backend, archives in backup.get_all_archives():
+                archives = (archive for archive in archives if self.within_timespec(archive))
                 sys.stdout.write("\t{}:\n".format(backend.name))
                 for archive in sorted(archives, cmp=lambda x,y: cmp(x.time, y.time)):
                     time = datetime.datetime.fromtimestamp(archive.time)

@@ -43,12 +43,15 @@ class Application(object):
             self.stderr_handler.disable()
 
     def get_due_backups(self):
-        backups = self.config.configured_backups.backups_due()
+        backups = self.config.configured_backup_set().backups_due()
         self.logger.info("Backups due: {}".format(", ".join([b.name for b in backups])))
         return backups
 
     def get_all_backups(self):
-        return self.config.configured_backups.all_backups()
+        return self.config.all_configured_backups()
+
+    def get_all_backends(self):
+        return self.config.all_configured_backends()
 
     def note_successful_backups(self, backups):
         self.config.save_state_given_new_backups(backups)
@@ -91,13 +94,25 @@ class Application(object):
                     human_time = time.strftime("%Y-%m-%d %H:%M:%S")
                     sys.stdout.write("\t\t{} ({})\n".format(human_time, archive.time))
 
+    def list_configured_backups(self):
+        for backup in self.get_all_backups():
+            sys.stdout.write("{}\n".format(backup.name))
+            for backend in backup.get_backends():
+                sys.stdout.write("\tto {}\n".format(backend.name))
+
+    def list_backends(self):
+        for backend in self.get_all_backends():
+            sys.stdout.write("{}\n".format(backend))
+
     def unknown_verb(self):
         raise Exception("Unknown verb")
 
     def run(self):
         verbs = {
             "backup": self.perform_backups,
-            "list": self.list_backups
+            "list": self.list_backups,
+            "list-configured-backups": self.list_configured_backups,
+            "list-backends": self.list_backends
         }
         try:
             self.bootstrap()

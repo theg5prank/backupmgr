@@ -36,6 +36,10 @@ class TarsnapBackend(backend_types.BackupBackend):
         self.keyfile = config.pop("keyfile", None)
         self.host = config.pop("host", None)
 
+    def __str__(self):
+        addendum = " ({} with {})".format(self.host, self.keyfile)
+        return super(TarsnapBackend, self).__str__() + addendum
+
     def create_backup_identifier(self, backup_name):
         ctx = hashlib.sha1()
         ctx.update(self.name.decode("utf-8"))

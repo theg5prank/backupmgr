@@ -36,5 +36,8 @@ class BackupBackend(object):
         if self.name is None:
             raise BackendConfigurationError("Missing name for backend")
 
+    def __str__(self):
+        return "{}: {}".format(self.__class__.__name__, self.name)
+
 def load_backend_types():
     from . import backup_backends

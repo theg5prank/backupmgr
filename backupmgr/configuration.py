@@ -148,6 +148,9 @@ class ConfiguredBackup(object):
 
         return pairs
 
+    def get_backends(self):
+        return list(self.backends)
+
 
 class ConfiguredBackupSet(object):
     @property
@@ -221,6 +224,10 @@ class Config(object):
                                  type=parse_simple_date)
         parser_list.add_argument("--after", dest="after", default=None,
                                  type=parse_simple_date)
+        parser_list_backups = subparsers.add_parser("list-configured-backups")
+        parser_list_backups.set_defaults(verb="list-configured-backups")
+        parser_list_backends = subparsers.add_parser("list-backends")
+        parser_list_backends.set_defaults(verb="list-backends")
         return parser.parse_args(self.argv)
 
     def default_state(self):
@@ -244,6 +251,15 @@ class Config(object):
     def save_state_given_new_backups(self, backups):
         new_state = self.configured_backups.state_after_backups(backups)
         self.save_state(new_state)
+
+    def all_configured_backups(self):
+        return self.configured_backups.all_backups()
+
+    def configured_backup_set(self):
+        return self.configured_backups
+
+    def all_configured_backends(self):
+        return self.configured_backends.values()
 
     def __init__(self, argv, prog):
         self.argv = argv

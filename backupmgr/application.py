@@ -108,10 +108,11 @@ class Application(object):
         for backup in self.get_all_backups():
             sys.stdout.write("{}:\n".format(backup.name))
             for backend, archives in backup.get_all_archives():
-                archives = (archive for archive in archives if self.within_timespec(archive))
+                sorted_archives = sorted(archives, cmp=lambda x,y: cmp(x.datetime, y.datetime))
+                enumerated_archives = ((i, archive) for i, archive in enumerate(sorted_archives) if self.within_timespec(archive))
                 sys.stdout.write("\t{}:\n".format(backend.name))
-                for archive in sorted(archives, cmp=lambda x,y: cmp(x.datetime, y.datetime)):
-                    sys.stdout.write("\t\t{}\n".format(pretty_archive(archive)))
+                for i, archive in enumerated_archives:
+                    sys.stdout.write("\t\t{}: {}\n".format(i, pretty_archive(archive)))
 
     def list_configured_backups(self):
         for backup in self.get_all_backups():

@@ -139,10 +139,17 @@ class ConfiguredBackup(object):
             success = success and backend.perform(self.paths, self.name)
         return success
 
-    def get_all_archives(self):
+    def get_all_archives(self, backends=None):
+        if backends is None:
+            backends = self.backends
+
+        for backend in backends:
+            if backend not in self.backends:
+                raise Exception("Passed a backend we don't own!?")
+
         pairs = []
 
-        for backend in self.backends:
+        for backend in backends:
             pairs.append(
                 [backend, backend.existing_archives_for_name(self.name)])
 
@@ -216,18 +223,30 @@ class Config(object):
         parser.add_argument("-q", "--quiet", action="store_true",
                             help="Be quiet on logging to stdout/stderr")
         subparsers = parser.add_subparsers()
+
         parser_backup = subparsers.add_parser("backup")
         parser_backup.set_defaults(verb="backup")
+
         parser_list = subparsers.add_parser("list")
         parser_list.set_defaults(verb="list")
         parser_list.add_argument("--before", dest="before", default=None,
                                  type=parse_simple_date)
         parser_list.add_argument("--after", dest="after", default=None,
                                  type=parse_simple_date)
+
+        parser_restore = subparsers.add_parser("restore")
+        parser_restore.set_defaults(verb="restore")
+        parser_restore.add_argument("backup", metavar="BACKUPNAME", type=str)
+        parser_restore.add_argument("backend", metavar="BACKENDNAME", type=str)
+        parser_restore.add_argument("archive_spec", metavar="SPEC", type=str)
+        parser_restore.add_argument("destination", metavar="DEST", type=str)
+
         parser_list_backups = subparsers.add_parser("list-configured-backups")
         parser_list_backups.set_defaults(verb="list-configured-backups")
+
         parser_list_backends = subparsers.add_parser("list-backends")
         parser_list_backends.set_defaults(verb="list-backends")
+
         return parser.parse_args(self.argv)
 
     def default_state(self):

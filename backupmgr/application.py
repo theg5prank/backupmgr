@@ -1,4 +1,5 @@
 #!/usr/bin/env python2.7
+# -*- coding: utf-8 -*-
 
 import logging
 import os
@@ -6,12 +7,19 @@ import sys
 import traceback
 import datetime
 import dateutil
+import dateutil.tz
 
 from . import configuration
 from . import package_logger
 from . import error
 from . import backend_types
 from . import logging_handlers
+from . import archive_specifiers
+
+def pretty_archive(archive):
+    local_time = archive.datetime.astimezone(dateutil.tz.tzlocal())
+    human_time = local_time.strftime("%Y-%m-%d %H:%M:%S")
+    return "{} ({})".format(human_time, archive.timestamp)
 
 class Application(object):
     @property
@@ -50,8 +58,22 @@ class Application(object):
     def get_all_backups(self):
         return self.config.all_configured_backups()
 
+    def get_backup_by_name(self, name):
+        for backup in self.get_all_backups():
+            if backup.name == name:
+                return backup
+        else:
+            raise error.Error("Couldn't find backup with name {}".format(name))
+
     def get_all_backends(self):
         return self.config.all_configured_backends()
+
+    def get_backend_by_name(self, name):
+        for backend in self.get_all_backends():
+            if backend.name == name:
+                return backend
+        else:
+            raise error.Error("Couldn't find backend with name {}".format(name))
 
     def note_successful_backups(self, backups):
         self.config.save_state_given_new_backups(backups)
@@ -62,8 +84,7 @@ class Application(object):
     def within_timespec(self, archive):
         before = self.config.config_options.before
         after = self.config.config_options.after
-        archive_date = datetime.datetime.utcfromtimestamp(archive.time)
-        archive_date = archive_date.replace(tzinfo=dateutil.tz.tzutc())
+        archive_date = archive.datetime
         if before is not None and archive_date >= before:
             return False
         if after is not None and archive_date <= after:
@@ -83,16 +104,14 @@ class Application(object):
         self.note_successful_backups(backup_successes)
         self.logger.info("Successfully completed {}/{} backups.".format(len(backup_successes), len(backups)))
 
-    def list_backups(self):
+    def list_archives(self):
         for backup in self.get_all_backups():
             sys.stdout.write("{}:\n".format(backup.name))
             for backend, archives in backup.get_all_archives():
                 archives = (archive for archive in archives if self.within_timespec(archive))
                 sys.stdout.write("\t{}:\n".format(backend.name))
-                for archive in sorted(archives, cmp=lambda x,y: cmp(x.time, y.time)):
-                    time = datetime.datetime.fromtimestamp(archive.time)
-                    human_time = time.strftime("%Y-%m-%d %H:%M:%S")
-                    sys.stdout.write("\t\t{} ({})\n".format(human_time, archive.time))
+                for archive in sorted(archives, cmp=lambda x,y: cmp(x.datetime, y.datetime)):
+                    sys.stdout.write("\t\t{}\n".format(pretty_archive(archive)))
 
     def list_configured_backups(self):
         for backup in self.get_all_backups():
@@ -104,21 +123,50 @@ class Application(object):
         for backend in self.get_all_backends():
             sys.stdout.write("{}\n".format(backend))
 
+    def restore_backup(self):
+        backup_name = self.config.config_options.backup
+        backup = self.get_backup_by_name(backup_name)
+        backend_name = self.config.config_options.backend
+        backend = self.get_backend_by_name(backend_name)
+        if backend not in backup.backends:
+            raise error.Error(
+                "backend {} not configured for backup {}".format(backend_name,
+                                                                 backup_name))
+        spec_str = self.config.config_options.archive_spec
+        spec = archive_specifiers.ArchiveSpecifier(spec_str)
+        matches = []
+        for _, archives in backup.get_all_archives(backends=[backend]):
+            for i, archive in enumerate(sorted(archives, cmp=lambda x,y: cmp(x.datetime, y.datetime))):
+                if spec.evaluate(archive, i):
+                    matches.append(archive)
+
+        if len(matches) > 1:
+            msg = "Spec {} matched more than one archive!".format(spec_str)
+            for match in matches:
+                msg += "\n\t{}".format(pretty_archive(match))
+            raise error.Error(msg)
+        if len(matches) == 0:
+            raise error.Error("Spec {} matched no archives!".format(spec_str))
+
+        archive = matches[0]
+        return archive.restore(self.config.config_options.destination)
+
     def unknown_verb(self):
         raise Exception("Unknown verb")
 
     def run(self):
         verbs = {
             "backup": self.perform_backups,
-            "list": self.list_backups,
+            "list": self.list_archives,
             "list-configured-backups": self.list_configured_backups,
-            "list-backends": self.list_backends
+            "list-backends": self.list_backends,
+            "restore": self.restore_backup
         }
         try:
             self.bootstrap()
             self.load_config()
-            verbs.get(self.config.config_options.verb, self.unknown_verb)()
-            sys.exit(0)
+            ok = verbs.get(self.config.config_options.verb, self.unknown_verb)()
+            sys.exit(0 if ok or ok is None else 1)
         except error.Error as e:
             self.logger.fatal(e.message)
             sys.exit(1)

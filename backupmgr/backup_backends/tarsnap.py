@@ -6,6 +6,8 @@ import shutil
 import errno
 import subprocess
 import hashlib
+import datetime
+import dateutil.tz
 import time
 import re
 
@@ -19,10 +21,28 @@ def backup_instance_regex(identifier, name):
         r"^(?P<identifier>{})-(?P<timestamp>\d+(.\d+)?)-(?P<name>{})$"
             .format(re.escape(identifier), re.escape(name)))
 
-class TarsnapArchive(object):
-    def __init__(self, backend, time):
+class TarsnapArchive(backend_types.Archive):
+    @property
+    def logger(self):
+        return package_logger().getChild("tarsnap_archive")
+
+    def __init__(self, backend, timestamp, fullname):
+        self.fullname = fullname
         self.backend = backend
-        self.time = time
+        self.timestamp = timestamp
+
+    def restore(self, destination):
+        argv = [TARSNAP_PATH, "-C", destination, "-x", "-f", self.fullname]
+        proc = subprocess.Popen(argv, stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
+        proc_logger = self.logger.getChild("tarsnap_output")
+        for line in proc.stdout:
+            proc_logger.info(line.strip())
+        code = proc.wait()
+        if code != 0:
+            self.logger.error("Tarsnap invocation failed with exit code {}".format(code))
+            return False
+        return True
+
 
 class TarsnapBackend(backend_types.BackupBackend):
     NAMES = {"tarsnap"}
@@ -98,7 +118,7 @@ class TarsnapBackend(backend_types.BackupBackend):
             m = regex.match(line)
             if m:
                 ts = float(m.groupdict()["timestamp"])
-                results.append(TarsnapArchive(self, ts))
+                results.append(TarsnapArchive(self, ts, m.group()))
 
         if proc.wait() != 0:
             self.logger.error("Tarsnap invocation failed with exit code {}".format(proc.returncode))

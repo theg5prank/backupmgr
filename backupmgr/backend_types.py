@@ -2,6 +2,8 @@
 
 import pkgutil
 import inspect
+import datetime
+import dateutil.tz
 
 from . import error
 
@@ -38,6 +40,13 @@ class BackupBackend(object):
 
     def __str__(self):
         return "{}: {}".format(self.__class__.__name__, self.name)
+
+class Archive(object):
+    @property
+    def datetime(self):
+        dt = datetime.datetime.fromtimestamp(self.timestamp)
+        dt = dt.replace(tzinfo=dateutil.tz.tzlocal())
+        return dt
 
 def load_backend_types():
     from . import backup_backends

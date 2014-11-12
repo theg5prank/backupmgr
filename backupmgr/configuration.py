@@ -12,11 +12,17 @@ import itertools
 import socket
 import argparse
 
-import dateutil.parser, dateutil.tz
+import dateutil.parser, dateutil.tz, dateutil.relativedelta
 
 from . import package_logger
 from . import error
 from . import backend_types
+
+LOCAL_TZ = dateutil.tz.tzlocal()
+UTC_TZ = dateutil.tz.tzutc()
+
+LOCAL_EPOCH = datetime.datetime.fromtimestamp(0).replace(tzinfo=LOCAL_TZ)
+UTC_EPOCH = datetime.datetime.utcfromtimestamp(0).replace(tzinfo=UTC_TZ)
 
 if sys.platform.startswith("darwin"):
     DEFAULT_STATEFILE = "/var/db/backupmgr.state"
@@ -31,6 +37,16 @@ MONTHLY = object()
 WEEKLY = object()
 
 WEEKDAY_NUMBERS = dict(zip(WEEKDAYS, itertools.count()))
+
+WEEKDAY_RELATIVE_DAY_MAP = [
+    dateutil.relativedelta.MO,
+    dateutil.relativedelta.TU,
+    dateutil.relativedelta.WE,
+    dateutil.relativedelta.TH,
+    dateutil.relativedelta.FR,
+    dateutil.relativedelta.SA,
+    dateutil.relativedelta.SU
+]
 
 def module_logger():
     return package_logger().getChild("configuration")
@@ -101,6 +117,33 @@ def validate_paths(paths):
 
     return paths
 
+def next_due_run(timespec, since):
+    def next_due_run_part(part):
+        tgt = None
+        if part is MONTHLY:
+            rel = (dateutil.relativedelta
+                   .relativedelta(months=1, day=1, hour=0, minute=0, second=0,
+                                  microsecond=0))
+            # Go to midnight on the first of the next month
+            tgt = since + rel
+        if part is WEEKLY:
+            part = MONDAY
+        if part in WEEKDAYS:
+            # if since is the same weekday as we have selected, "1st <day>"
+            # would just be that day, so we need to also advance one day before
+            # asking for the "1st <day>".
+            relative_cls = WEEKDAY_RELATIVE_DAY_MAP[WEEKDAY_NUMBERS[part]]
+            day = relative_cls(1)
+            rel = (dateutil.relativedelta
+                   .relativedelta(weekday=day, days=+1, hour=0, minute=0,
+                                  second=0, microsecond=0))
+            tgt = since + rel
+
+        assert tgt is not None
+        return tgt
+    return min((next_due_run_part(part) for part in timespec))
+
+
 class ConfiguredBackup(object):
     @property
     def logger(self):
@@ -113,25 +156,9 @@ class ConfiguredBackup(object):
         self.timespec = timespec
         self.backends = backends
 
-    def should_run(self, last_run, time):
-        if last_run == datetime.datetime.fromtimestamp(0):
-            return True
-
-        delta = time - last_run
-        if delta.days == 0 and delta.seconds / 3600 < 12:
-            self.logger.warn("Backup \"{}\" ran in the "
-                             "last 12 hours (at {})".format(self.name, last_run))
-            return False
-        if MONTHLY in self.timespec and time.day == 1:
-            return True
-        if WEEKLY in self.timespec and time.weekday() == WEEKDAY_NUMBERS[MONDAY]:
-            return True
-
-        days = {WEEKDAY_NUMBERS[day] for day in self.timespec if day in WEEKDAYS}
-        if datetime.datetime.now().weekday() in days:
-            return True
-
-        return False
+    def should_run(self, last_run, now):
+        due = next_due_run(self.timespec, last_run)
+        return due < now
 
     def perform(self):
         success = True
@@ -180,7 +207,7 @@ class ConfiguredBackupSet(object):
 
     def last_run_of_backup(self, backup):
         stamp = self.state.get(backup.name, 0)
-        return datetime.datetime.fromtimestamp(stamp)
+        return datetime.datetime.fromtimestamp(stamp).replace(tzinfo=LOCAL_TZ)
 
     def backups_due(self):
         backups_to_run = []
@@ -209,7 +236,7 @@ def parse_simple_date(datestr):
             date = date.replace(tzinfo=dateutil.tz.tzlocal())
     else:
         date = datetime.datetime.fromtimestamp(timestamp)
-        date = date.replace(tzinfo=dateutil.tz.tzlocal())
+        date = date.replace(tzinfo=LOCAL_TZ)
 
     return date
 
@@ -365,4 +392,4 @@ class Config(object):
 
         self.configured_backups = ConfiguredBackupSet(
             state, configured_backups, os.stat(self.configfile).st_mtime,
-            state_mtime, datetime.datetime.now())
+            state_mtime, datetime.datetime.now().replace(tzinfo=LOCAL_TZ))

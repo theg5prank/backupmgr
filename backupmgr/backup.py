@@ -1,4 +1,5 @@
 #!/usr/bin/env python2.7
+# -*- coding: utf-8 -*-
 
 import datetime
 import itertools
@@ -73,10 +74,10 @@ class Backup(object):
         due = next_due_run(self.timespec, last_run)
         return due < now
 
-    def perform(self):
+    def perform(self, now):
         success = True
         for backend in self.backends:
-            success = success and backend.perform(self.paths, self.name)
+            success = success and backend.perform(self.paths, self.name, now)
         return success
 
     def get_all_archives(self, backends=None):

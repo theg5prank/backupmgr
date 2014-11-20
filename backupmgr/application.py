@@ -99,7 +99,7 @@ class Application(object):
         backups = self.get_due_backups()
         backup_successes = []
         for backup in backups:
-            if backup.perform():
+            if backup.perform(datetime.datetime.now(dateutil.tz.tzlocal())):
                 backup_successes.append(backup)
         self.note_successful_backups(backup_successes)
         self.logger.info("Successfully completed {}/{} backups.".format(len(backup_successes), len(backups)))

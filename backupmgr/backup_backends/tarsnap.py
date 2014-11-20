@@ -66,12 +66,14 @@ class TarsnapBackend(backend_types.BackupBackend):
         ctx.update(backup_name.decode("utf-8"))
         return ctx.hexdigest()
 
-    def create_backup_instance_name(self, backup_name):
+    def create_backup_instance_name(self, backup_name, timestamp):
+        unixtime = time.mktime(timestamp.timetuple())
         return "{}-{}-{}".format(self.create_backup_identifier(backup_name),
-                                 time.time(), backup_name)
+                                 unixtime, backup_name)
 
-    def perform(self, paths, backup_name):
-        backup_instance_name = self.create_backup_instance_name(backup_name)
+    def perform(self, paths, backup_name, now_timestamp):
+        backup_instance_name = self.create_backup_instance_name(backup_name,
+                                                                now_timestamp)
         self.logger.info("Creating backup \"{}\": {}"
                             .format(backup_instance_name, ", ".join(paths)))
         tmpdir = tempfile.mkdtemp()

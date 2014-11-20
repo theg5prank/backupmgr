@@ -17,6 +17,9 @@ def register_backend_type(type, name):
         raise Exception("Backend name collision: {}".format(name))
     _BACKEND_TYPES[name] = type
 
+def unregister_backend_type(name):
+    del _BACKEND_TYPES[name]
+
 def backend_type(name):
     return _BACKEND_TYPES.get(name, None)
 

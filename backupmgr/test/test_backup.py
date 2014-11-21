@@ -4,6 +4,7 @@
 import unittest
 import datetime
 
+import mock
 import dateutil
 import dateutil.tz
 
@@ -116,3 +117,18 @@ class NextDueRunTests(unittest.TestCase):
         locals()[tst.__name__] = tst
 
     del mk_closure, tst, spec, time, tgt, name
+
+class BackupTests(unittest.TestCase):
+    def setUp(self):
+        self.backends = [mock.NonCallableMagicMock() for _ in xrange(3)]
+        self.name = "foobar"
+        self.paths ={
+            "/uno": "one",
+            "/dos": "two"
+        }
+        self.timespec = [backup.MONDAY, backup.WEDNESDAY, backup.FRIDAY]
+        self.backup = backup.Backup(self.name, self.paths, "FIXME",
+                                    self.timespec, self.backends)
+
+    def test_get_backends(self):
+        self.assertEqual(set(self.backends), set(self.backup.get_backends()))

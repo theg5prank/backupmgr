@@ -105,9 +105,16 @@ class Application(object):
         self.logger.info("Successfully completed {}/{} backups.".format(len(backup_successes), len(backups)))
 
     def list_archives(self):
+        backend_to_primed_list_token_map = {}
+        for backup in self.get_all_backups():
+            for backend in backup.backends:
+                if backend not in backend_to_primed_list_token_map:
+                    token = backend.get_primed_list_token()
+                    backend_to_primed_list_token_map[backend] = token
+            
         for backup in self.get_all_backups():
             sys.stdout.write("{}:\n".format(backup.name))
-            for backend, archives in backup.get_all_archives():
+            for backend, archives in backup.get_all_archives(backend_to_primed_list_token_map=backend_to_primed_list_token_map):
                 sorted_archives = sorted(archives, cmp=lambda x,y: cmp(x.datetime, y.datetime))
                 enumerated_archives = ((i, archive) for i, archive in enumerate(sorted_archives) if self.within_timespec(archive))
                 sys.stdout.write("\t{}:\n".format(backend.name))

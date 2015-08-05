@@ -80,7 +80,7 @@ class Backup(object):
             success = success and backend.perform(self.paths, self.name, now)
         return success
 
-    def get_all_archives(self, backends=None):
+    def get_all_archives(self, backends=None, backend_to_primed_list_token_map=None):
         if backends is None:
             backends = self.backends
 
@@ -91,8 +91,12 @@ class Backup(object):
         pairs = []
 
         for backend in backends:
+            token = None
+            if backend_to_primed_list_token_map is not None:
+                assert backend in backend_to_primed_list_token_map, "Backend {} not in primed token map?".format(backend)
+                token = backend_to_primed_list_token_map[backend]
             pairs.append(
-                [backend, backend.existing_archives_for_name(self.name)])
+                [backend, backend.existing_archives_for_name(self.name, primed_list_token=token)])
 
         return pairs
 

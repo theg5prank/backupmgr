@@ -10,6 +10,7 @@ import datetime
 import dateutil.tz
 import time
 import re
+import StringIO
 
 from .. import backend_types
 from .. import package_logger
@@ -42,6 +43,14 @@ class TarsnapArchive(backend_types.Archive):
             self.logger.error("Tarsnap invocation failed with exit code {}".format(code))
             return False
         return True
+
+
+class _TarsnapPrimedListToken(object):
+    def __init__(self, tarsnap_output):
+        self.tarsnap_output = tarsnap_output
+
+    def iterlines(self):
+        return StringIO.StringIO(self.tarsnap_output)
 
 
 class TarsnapBackend(backend_types.BackupBackend):
@@ -105,24 +114,44 @@ class TarsnapBackend(backend_types.BackupBackend):
                         pass
             os.rmdir(tmpdir)
 
-    def existing_archives_for_name(self, backup_name):
+    def existing_archives_for_name(self, backup_name, primed_list_token=None):
+        argv = [TARSNAP_PATH, "--list-archives"]
+        if self.keyfile is not None:
+            argv += ["--keyfile", self.keyfile]
+
+        proc = None
+        f = None
+        if primed_list_token is not None:
+            f = primed_list_token.iterlines()
+        else:
+            proc = subprocess.Popen(argv, stdout=subprocess.PIPE)
+            f = proc.stdout
+
+        identifier = self.create_backup_identifier(backup_name)
+        regex = backup_instance_regex(identifier, backup_name)
+
+        results = []
+        for line in f:
+            m = regex.match(line)
+            if m:
+                ts = float(m.groupdict()["timestamp"])
+                results.append(TarsnapArchive(self, ts, m.group()))
+
+        if proc is not None and proc.wait() != 0:
+            self.logger.error("Tarsnap invocation failed with exit code {}".format(proc.returncode))
+
+        return results
+
+    def get_primed_list_token(self):
         argv = [TARSNAP_PATH, "--list-archives"]
         if self.keyfile is not None:
             argv += ["--keyfile", self.keyfile]
 
         proc = subprocess.Popen(argv, stdout=subprocess.PIPE)
 
-        identifier = self.create_backup_identifier(backup_name)
-        regex = backup_instance_regex(identifier, backup_name)
-
-        results = []
-        for line in proc.stdout:
-            m = regex.match(line)
-            if m:
-                ts = float(m.groupdict()["timestamp"])
-                results.append(TarsnapArchive(self, ts, m.group()))
+        token = _TarsnapPrimedListToken(proc.stdout.read())
 
         if proc.wait() != 0:
             self.logger.error("Tarsnap invocation failed with exit code {}".format(proc.returncode))
 
-        return results
+        return token

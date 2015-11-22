@@ -27,13 +27,13 @@ class TarsnapArchive(backend_types.Archive):
     def logger(self):
         return package_logger().getChild("tarsnap_archive")
 
-    def __init__(self, backend, timestamp, fullname):
+    def __init__(self, backend, timestamp, fullname, backup_name):
         self.fullname = fullname
         self.backend = backend
         self.timestamp = timestamp
+        self.backup_name = backup_name
 
-    def restore(self, destination):
-        argv = [TARSNAP_PATH, "-C", destination, "-x", "-f", self.fullname]
+    def _invoke_tarsnap(self, argv):
         proc = subprocess.Popen(argv, stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
         proc_logger = self.logger.getChild("tarsnap_output")
         for line in proc.stdout:
@@ -44,6 +44,14 @@ class TarsnapArchive(backend_types.Archive):
             return False
         return True
 
+    def restore(self, destination):
+        argv = [TARSNAP_PATH, "-C", destination, "-x", "-f", self.fullname]
+        return self._invoke_tarsnap(argv)
+
+    def destroy(self):
+        self.logger.info("destroying {}".format(self))
+        argv = [TARSNAP_PATH, "-d", "-f", self.fullname]
+        return self._invoke_tarsnap(argv)
 
 class _TarsnapPrimedListToken(object):
     def __init__(self, tarsnap_output):
@@ -135,7 +143,7 @@ class TarsnapBackend(backend_types.BackupBackend):
             m = regex.match(line)
             if m:
                 ts = float(m.groupdict()["timestamp"])
-                results.append(TarsnapArchive(self, ts, m.group()))
+                results.append(TarsnapArchive(self, ts, m.group(), backup_name))
 
         if proc is not None and proc.wait() != 0:
             self.logger.error("Tarsnap invocation failed with exit code {}".format(proc.returncode))

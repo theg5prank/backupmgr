@@ -15,6 +15,7 @@ from . import error
 from . import backend_types
 from . import logging_handlers
 from . import archive_specifiers
+from . import pruning_engine
 
 def pretty_archive(archive):
     local_time = archive.datetime.astimezone(dateutil.tz.tzlocal())
@@ -104,14 +105,19 @@ class Application(object):
         self.note_successful_backups(backup_successes)
         self.logger.info("Successfully completed {}/{} backups.".format(len(backup_successes), len(backups)))
 
-    def list_archives(self):
+    def get_backend_to_primed_list_token_map(self):
         backend_to_primed_list_token_map = {}
         for backup in self.get_all_backups():
             for backend in backup.backends:
                 if backend not in backend_to_primed_list_token_map:
                     token = backend.get_primed_list_token()
                     backend_to_primed_list_token_map[backend] = token
-            
+        return backend_to_primed_list_token_map
+
+
+    def list_archives(self):
+        backend_to_primed_list_token_map = self.get_backend_to_primed_list_token_map()
+
         for backup in self.get_all_backups():
             sys.stdout.write("{}:\n".format(backup.name))
             for backend, archives in backup.get_all_archives(backend_to_primed_list_token_map=backend_to_primed_list_token_map):
@@ -159,6 +165,15 @@ class Application(object):
         archive = matches[0]
         return archive.restore(self.config.config_options.destination)
 
+    def prune_archives(self):
+        backend_to_primed_list_token_map = self.get_backend_to_primed_list_token_map()
+        for backup in self.get_all_backups():
+            pruning_config = self.config.pruning_configuration.get_backup_pruning_config(backup.name)
+            for backend, archives in backup.get_all_archives(backend_to_primed_list_token_map=backend_to_primed_list_token_map):
+                engine = pruning_engine.PruningEngine(pruning_config)
+                archives_to_prune = engine.prunable_archives(archives)
+                engine.prune_archives(archives_to_prune)
+
     def unknown_verb(self):
         raise Exception("Unknown verb")
 
@@ -168,7 +183,8 @@ class Application(object):
             "list": self.list_archives,
             "list-configured-backups": self.list_configured_backups,
             "list-backends": self.list_backends,
-            "restore": self.restore_backup
+            "restore": self.restore_backup,
+            "prune": self.prune_archives
         }
         try:
             self.bootstrap()

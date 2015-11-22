@@ -107,6 +107,20 @@ def parse_simple_date(datestr):
     return date
 
 
+BackupPruningConfiguration = collections.namedtuple(
+    "BackupPruningConfiguration", ["backup_name", "daily_count", "weekly_count", "monthly_count"])
+
+class PruningConfiguration(object):
+    def __init__(self, backup_pruning_configs):
+        self.__map = {}
+        for config in backup_pruning_configs:
+            self.__map[config.backup_name] = config
+
+    def get_backup_pruning_config(self, name):
+        inf = float("inf")
+        return self.__map.get(name, BackupPruningConfiguration(name, inf, inf, inf))
+
+
 class NoConfigError(error.Error):
     def __init__(self):
         super(NoConfigError, self).__init__("No config exists.")
@@ -151,6 +165,9 @@ class Config(object):
         parser_list_backends = subparsers.add_parser("list-backends")
         parser_list_backends.set_defaults(verb="list-backends")
 
+        parser_prune = subparsers.add_parser("prune")
+        parser_prune.set_defaults(verb="prune")
+
         return parser.parse_args(self.argv)
 
     def default_state(self):
@@ -183,6 +200,22 @@ class Config(object):
 
     def all_configured_backends(self):
         return self.configured_backends.values()
+
+    def _parse_pruning_behavior(self, pruning_info):
+        if not isinstance(pruning_info, dict):
+            raise InvalidConfigError("Pruning info must be a dictionary")
+        parsed_configs = []
+        for name, config in pruning_info.items():
+            if name not in [x.name for x in self.all_configured_backups()]:
+                msg = "Attempt to define backup configuration for unknown backup {}".format(name)
+                raise InvalidConfigError(msg)
+            inf = float("inf")
+            daily = config.get("daily", inf)
+            weekly = config.get("weekly", inf)
+            monthly = config.get("montly", inf)
+            backup_config = BackupPruningConfiguration(name, daily, weekly, monthly)
+            parsed_configs.append(backup_config)
+        self.pruning_configuration = PruningConfiguration(parsed_configs)
 
     def __init__(self, argv, prog):
         self.argv = argv
@@ -270,3 +303,5 @@ class Config(object):
         self.configured_backups = backup.BackupSet(
             state, configured_backups, os.stat(self.configfile).st_mtime,
             state_mtime, datetime.datetime.now().replace(tzinfo=LOCAL_TZ))
+
+        self._parse_pruning_behavior(config_dict.get("pruning", {}))

@@ -51,5 +51,8 @@ class Archive(object):
         dt = dt.replace(tzinfo=dateutil.tz.tzlocal())
         return dt
 
+    def __str__(self):
+        return "'{}' with {} at {}".format(self.backup_name, self.backend.name, self.datetime)
+
 def load_backend_types():
     from . import backup_backends

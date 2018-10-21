@@ -11,7 +11,7 @@ import setuptools
 
 SRCROOT = os.path.dirname(os.path.abspath(inspect.getsourcefile(lambda: None)))
 READMES = [
-    'README.txt',
+    'README.md',
     'CHANGES.txt'
 ]
 

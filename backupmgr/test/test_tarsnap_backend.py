@@ -121,7 +121,8 @@ class TestTarsnapArchive(unittest.TestCase):
         self.archive = tarsnap.TarsnapArchive(
             self.backend,
             1416279400.0,
-            "712fded485ebd593f5954e38acb78ea437c15997-1416279400.0-mrgl")
+            "712fded485ebd593f5954e38acb78ea437c15997-1416279400.0-mrgl",
+            "mrgl")
 
     def test_restore_invokes_tarsnap_correctly(self):
         instance_mock = mock.NonCallableMagicMock()

@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import logging
@@ -121,7 +121,7 @@ class Application(object):
         for backup in self.get_all_backups():
             sys.stdout.write("{}:\n".format(backup.name))
             for backend, archives in backup.get_all_archives(backend_to_primed_list_token_map=backend_to_primed_list_token_map):
-                sorted_archives = sorted(archives, cmp=lambda x,y: cmp(x.datetime, y.datetime))
+                sorted_archives = sorted(archives, key=lambda x: x.datetime)
                 enumerated_archives = ((i, archive) for i, archive in enumerate(sorted_archives) if self.within_timespec(archive))
                 sys.stdout.write("\t{}:\n".format(backend.name))
                 for i, archive in enumerated_archives:
@@ -150,7 +150,7 @@ class Application(object):
         spec = archive_specifiers.ArchiveSpecifier(spec_str)
         matches = []
         for _, archives in backup.get_all_archives(backends=[backend]):
-            for i, archive in enumerate(sorted(archives, cmp=lambda x,y: cmp(x.datetime, y.datetime))):
+            for i, archive in enumerate(sorted(archives, key=lambda x: x.datetime)):
                 if spec.evaluate(archive, i):
                     matches.append(archive)
 
@@ -189,10 +189,14 @@ class Application(object):
         try:
             self.bootstrap()
             self.load_config()
-            ok = verbs.get(self.config.config_options.verb, self.unknown_verb)()
+            if self.config.config_options.verb is None:
+                self.logger.fatal("No verb provided.")
+                ok = False
+            else:
+                ok = verbs.get(self.config.config_options.verb, self.unknown_verb)()
             sys.exit(0 if ok or ok is None else 1)
         except error.Error as e:
-            self.logger.fatal(e.message)
+            self.logger.fatal(str(e))
             sys.exit(1)
         except Exception as e:
             self.logger.fatal("Unexpected error: {}".format(e))

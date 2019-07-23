@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import datetime
@@ -9,7 +9,7 @@ import dateutil.tz, dateutil.relativedelta
 
 from . import package_logger
 
-WEEKDAYS = [object() for _ in xrange(7)]
+WEEKDAYS = [object() for _ in range(7)]
 MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY = WEEKDAYS
 MONTHLY = object()
 WEEKLY = object()

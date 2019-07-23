@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import os, sys
@@ -22,7 +22,7 @@ def metadata(fullname):
     module = imp.new_module(fullname)
     module.__file__ = os.path.join(SRCROOT, *mdpath)
     with open(module.__file__, 'r') as fh:
-        exec fh in vars(module)
+        exec(fh.read(), vars(module))
     return module
 
 def setup(args=None):

@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 
 import os
 import tempfile
@@ -10,7 +10,7 @@ import datetime
 import dateutil.tz
 import time
 import re
-import StringIO
+import io
 
 from .. import backend_types
 from .. import package_logger
@@ -37,7 +37,7 @@ class TarsnapArchive(backend_types.Archive):
         proc = subprocess.Popen(argv, stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
         proc_logger = self.logger.getChild("tarsnap_output")
         for line in proc.stdout:
-            proc_logger.info(line.strip())
+            proc_logger.info(line.decode('utf-8').strip())
         code = proc.wait()
         if code != 0:
             self.logger.error("Tarsnap invocation failed with exit code {}".format(code))
@@ -55,10 +55,10 @@ class TarsnapArchive(backend_types.Archive):
 
 class _TarsnapPrimedListToken(object):
     def __init__(self, tarsnap_output):
-        self.tarsnap_output = tarsnap_output
+        self.tarsnap_output_text = tarsnap_output.decode('utf-8')
 
     def iterlines(self):
-        return StringIO.StringIO(self.tarsnap_output)
+        return io.StringIO(self.tarsnap_output_text)
 
 
 class TarsnapBackend(backend_types.BackupBackend):
@@ -79,8 +79,8 @@ class TarsnapBackend(backend_types.BackupBackend):
 
     def create_backup_identifier(self, backup_name):
         ctx = hashlib.sha1()
-        ctx.update(self.name.decode("utf-8"))
-        ctx.update(backup_name.decode("utf-8"))
+        ctx.update(self.name.encode("utf-8"))
+        ctx.update(backup_name.encode("utf-8"))
         return ctx.hexdigest()
 
     def create_backup_instance_name(self, backup_name, timestamp):
@@ -100,12 +100,12 @@ class TarsnapBackend(backend_types.BackupBackend):
             argv = [TARSNAP_PATH, "-C", tmpdir, "-H", "-cf", backup_instance_name]
             if self.keyfile is not None:
                 argv += ["--keyfile", self.keyfile]
-            argv += paths.values()
+            argv += list(paths.values())
             self.logger.info("Invoking tarsnap: {}".format(argv))
             proc = subprocess.Popen(argv, stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
             proc_logger = self.logger.getChild("tarsnap_output")
             for line in proc.stdout:
-                proc_logger.info(line.strip())
+                proc_logger.info(line.decode('utf-8').strip())
             code = proc.wait()
             if code != 0:
                 self.logger.error("Tarsnap invocation failed with exit code {}".format(code))
@@ -117,7 +117,7 @@ class TarsnapBackend(backend_types.BackupBackend):
                 path = os.path.join(tmpdir, name)
                 try:
                     os.unlink(path)
-                except OSError, e:
+                except OSError as e:
                     if e.errno == errno.ENOENT:
                         pass
             os.rmdir(tmpdir)
@@ -133,7 +133,7 @@ class TarsnapBackend(backend_types.BackupBackend):
             f = primed_list_token.iterlines()
         else:
             proc = subprocess.Popen(argv, stdout=subprocess.PIPE)
-            f = proc.stdout
+            f = io.TextIOWrapper(proc.stdout, 'utf-8')
 
         identifier = self.create_backup_identifier(backup_name)
         regex = backup_instance_regex(identifier, backup_name)

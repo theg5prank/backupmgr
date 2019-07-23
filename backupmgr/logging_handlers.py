@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 
 import logging
 import smtplib
@@ -30,7 +30,7 @@ class EmailHandler(logging.Handler):
         argv = [SENDMAIL_PATH, self.toaddr]
         proc = subprocess.Popen(argv, stdin=subprocess.PIPE)
 
-        proc.stdin.write(m.as_string())
+        proc.stdin.write(m.as_string().encode('utf-8'))
         proc.stdin.close()
 
 

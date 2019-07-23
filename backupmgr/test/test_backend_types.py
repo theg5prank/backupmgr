@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import unittest
@@ -26,7 +26,7 @@ class TestBackupBackendName(unittest.TestCase):
     def test_str_correctness(self):
         class MyBackend(backend_types.BackupBackend):
             NAMES = ("mytype",)
-        self.assertEquals(str(MyBackend({"name":"foo"})), "MyBackend: foo")
+        self.assertEqual(str(MyBackend({"name":"foo"})), "MyBackend: foo")
         backend_types.unregister_backend_type("mytype")
 
 class TestArchiveBasics(unittest.TestCase):

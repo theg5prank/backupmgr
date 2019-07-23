@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 
 import pkgutil
 import inspect
@@ -32,8 +32,7 @@ class BackendType(type):
             register_backend_type(self, name)
 
 
-class BackupBackend(object):
-    __metaclass__ = BackendType
+class BackupBackend(object, metaclass=BackendType):
     NAMES = ()
 
     def __init__(self, config):

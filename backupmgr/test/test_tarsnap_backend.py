@@ -62,10 +62,12 @@ class TarsnapBackendTests(unittest.TestCase):
         self.assertEqual(len(mock_popen.call_args[0]), 1)
         self.assertEqual(mock_popen.call_args[0][0][:2], ["/usr/local/bin/tarsnap",
                                                            "-C"])
-        self.assertEqual(mock_popen.call_args[0][0][3:],
+        self.assertEqual(mock_popen.call_args[0][0][3:8],
                           ["-H", "-cf",
                            "712fded485ebd593f5954e38acb78ea437c15997-1416279400.0-mrgl",
-                           "--keyfile", "/root/theKey.key", "one", "two", "three"])
+                           "--keyfile", "/root/theKey.key"])
+        self.assertEqual(sorted(mock_popen.call_args[0][0][8:]),
+                         sorted(["one", "two", "three"]))
         self.assertEqual(mock_popen.call_args[1]["stderr"], subprocess.STDOUT)
         self.assertEqual(mock_popen.call_args[1]["stdout"], subprocess.PIPE)
         self.assertFalse(os.path.exists(do_wait.tmpdir)) # clean up your turds

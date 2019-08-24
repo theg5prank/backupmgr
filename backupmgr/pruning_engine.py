@@ -19,7 +19,7 @@ class PruningEngine(object):
         weekly_saved = {}
         monthly_saved = {}
 
-        sorted_archives = sorted(archives, key=lambda x: x.datetime)
+        sorted_archives = sorted(archives, key=lambda x: x.datetime, reverse=True)
 
         for archive in sorted_archives:
             archive_day = time_utilities.day(archive.datetime)

@@ -174,6 +174,10 @@ class Application(object):
                 archives_to_prune = engine.prunable_archives(archives)
                 engine.prune_archives(archives_to_prune)
 
+    def print_version(self):
+        from . import _metadata
+        print(f"backupmgr {_metadata.__version__}")
+
     def unknown_verb(self):
         raise Exception("Unknown verb")
 
@@ -184,7 +188,8 @@ class Application(object):
             "list-configured-backups": self.list_configured_backups,
             "list-backends": self.list_backends,
             "restore": self.restore_backup,
-            "prune": self.prune_archives
+            "prune": self.prune_archives,
+            "version": self.print_version,
         }
         try:
             self.bootstrap()

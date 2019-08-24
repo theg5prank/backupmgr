@@ -140,6 +140,8 @@ class Config(object):
         parser = argparse.ArgumentParser(prog=self.prog)
         parser.add_argument("-q", "--quiet", action="store_true",
                             help="Be quiet on logging to stdout/stderr")
+        parser.add_argument("--version", action="store_const", dest="verb",
+                        const="version")
         parser.set_defaults(verb=None)
         subparsers = parser.add_subparsers()
 

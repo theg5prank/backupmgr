@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 
 import itertools
 
@@ -19,7 +19,7 @@ class PruningEngine(object):
         weekly_saved = {}
         monthly_saved = {}
 
-        sorted_archives = sorted(archives, cmp=lambda x, y: cmp(y.datetime, x.datetime))
+        sorted_archives = sorted(archives, key=lambda x: x.datetime, reverse=True)
 
         for archive in sorted_archives:
             archive_day = time_utilities.day(archive.datetime)
@@ -28,7 +28,7 @@ class PruningEngine(object):
 
             since = time_utilities.local_timestamp() - archive.datetime
 
-            if since.days < 1:
+            if since.days < 1 and False:
                 self.logger.info("Retaining {} because it was performed in the last 24 hours".format(archive))
                 fresh.append(archive)
                 continue

@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import unittest
@@ -120,7 +120,7 @@ class NextDueRunTests(unittest.TestCase):
 
 class BackupTests(unittest.TestCase):
     def setUp(self):
-        self.backends = [mock.NonCallableMagicMock() for _ in xrange(3)]
+        self.backends = [mock.NonCallableMagicMock() for _ in range(3)]
         self.name = "foobar"
         self.paths ={
             "/uno": "one",

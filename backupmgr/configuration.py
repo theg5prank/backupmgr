@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import os
@@ -39,7 +39,7 @@ def prefix_match(s1, s2, required_length):
     return s1[:required_length] == s2[:required_length]
 
 def validate_timespec(spec):
-    if isinstance(spec, basestring):
+    if isinstance(spec, str):
         if spec.lower() == "weekly":
             return [WEEKLY]
         if spec.lower() == "monthly":
@@ -49,7 +49,7 @@ def validate_timespec(spec):
         else:
             spec = [spec]
 
-    if not isinstance(spec, list) or any((not isinstance(x, basestring) for x in spec)):
+    if not isinstance(spec, list) or any((not isinstance(x, str) for x in spec)):
         raise InvalidConfigError("Invalid timespec {}".format(spec))
 
     new_spec = set()
@@ -75,8 +75,8 @@ def validate_timespec(spec):
 
 def validate_paths(paths):
     if (not isinstance(paths, dict)
-        or any((not isinstance(x, basestring) for x in paths.keys()))
-        or any((not isinstance(x, basestring) for x in paths.values()))):
+        or any((not isinstance(x, str) for x in paths.keys()))
+        or any((not isinstance(x, str) for x in paths.values()))):
         raise InvalidConfigError("paths should be a string -> string dictionary")
 
     names = set()
@@ -140,6 +140,9 @@ class Config(object):
         parser = argparse.ArgumentParser(prog=self.prog)
         parser.add_argument("-q", "--quiet", action="store_true",
                             help="Be quiet on logging to stdout/stderr")
+        parser.add_argument("--version", action="store_const", dest="verb",
+                        const="version")
+        parser.set_defaults(verb=None)
         subparsers = parser.add_subparsers()
 
         parser_backup = subparsers.add_parser("backup")
@@ -229,10 +232,12 @@ class Config(object):
                 try:
                     config_dict = json.load(f)
                 except Exception as e:
-                    raise InvalidConfigError(e.message)
+                    raise InvalidConfigError(str(e))
         except IOError as e:
             if e.errno == errno.ENOENT:
-                raise NoConfigError()
+                nce = NoConfigError()
+                nce.__cause__ = e
+                raise nce
             else:
                 raise
         self.notification_address = config_dict.get("notification_address", "root")
@@ -269,7 +274,7 @@ class Config(object):
             if name is None:
                 raise InvalidConfigError("Backups must have names")
 
-            if not isinstance(backends, list) or any([not isinstance(x, basestring) for x in backends]):
+            if not isinstance(backends, list) or any([not isinstance(x, str) for x in backends]):
                 raise InvalidConfigError("Expected a list of strings for backends")
             def find_backend(name):
                 backend = self.configured_backends.get(name, None)

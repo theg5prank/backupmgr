@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import dateutil.parser
@@ -29,8 +29,7 @@ class ArchiveSpecifierMeta(type):
         return not self.__dict__.get("ABSTRACT", False)
 
 
-class ArchiveSpecifier(object):
-    __metaclass__ = ArchiveSpecifierMeta
+class ArchiveSpecifier(object, metaclass=ArchiveSpecifierMeta):
     ABSTRACT = True
 
 

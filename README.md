@@ -5,6 +5,6 @@
 backupmgr is a backup tool to manage your backups.
 
 ## dependencies
-* python2.7
+* python3
 * python-dateutil
 * mock (testing only)
